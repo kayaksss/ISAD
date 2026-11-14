@@ -1,0 +1,61 @@
+@startuml
+' 图ID: FIG-04 | 构件图(UML组件图) | PlantUML | REQ-06,REQ-07 / BR-05 / SRC-06,07,09 | 源码已自检，未在渲染器实测
+title 应用架构构件图：分层构件与接口技术
+
+actor "访客 / 第三方客户端" as Client
+component "表现层\nHTML/CSS/JS 列表页·详情页" as UI
+component "CDN 与反向代理\nCloudflare" as CDN
+component "loc.gov Web 应用\nControllers + Views" as WebApp
+component "查询编排服务\nQueryService" as QuerySvc
+component "格式渲染器\nHTML / JSON / YAML / iCal" as Renderers
+component "检索与分面引擎\nSearch & Facet" as Search
+component "条目元数据仓储\nItemRepository" as Repo
+component "日历导出适配器\niCal / Google TEMPLATE" as CalAdapter
+component "内容发布后台\n编审 / 审核 / 撤回" as ContentAdmin
+component "智能体运行时\n感知-规划-决策-行动" as AgentRuntime
+component "工具 / 记忆 / 知识库\n受控调用与最小权限" as AgentTools
+component "Sitemap 服务 (XML)" as Sitemap
+component "外围微服务\nText / IIIF Image / Streaming" as Micro
+component "外部日历服务\nGoogle Calendar" as Google
+
+() "HTTP GET /events/\nfa, q, fo, c, sp, sb, at" as I_Query
+() "JSON / YAML 结构化结果" as I_Json
+() "text/calendar (.ics)" as I_Ical
+() "XML Sitemap" as I_Sitemap
+() "IIIF / OCR / A-V 资源" as I_Micro
+() "受控工具接口 (MCP 类)" as I_Tool
+() "编审写入接口" as I_Editorial
+
+Client --> UI : 浏览
+UI --> CDN : HTTPS
+CDN --> WebApp : 转发与缓存
+WebApp ..> I_Query
+I_Query -- QuerySvc
+QuerySvc --> Search : 分面查询
+Search --> Repo : 读取元数据
+QuerySvc --> Renderers : 按 fo 选择 Strategy
+Renderers ..> I_Json
+Renderers ..> I_Ical
+CalAdapter ..> I_Ical
+CalAdapter --> Google : URL TEMPLATE 跳转
+Sitemap ..> I_Sitemap
+Micro ..> I_Micro
+ContentAdmin ..> I_Editorial
+ContentAdmin --> Repo : 写入与状态变更 [审核后]
+AgentRuntime ..> I_Tool
+AgentRuntime --> QuerySvc : 受控工具调用
+AgentTools ..> I_Tool
+Client ..> I_Json : 直接调用公开 API(无 API key)
+Client ..> I_Sitemap
+Client ..> I_Micro
+
+note right of WebApp
+  事实(SRC-06)：loc.gov JSON API 原本
+  就是为驱动 loc.gov 网站页面而设计
+  分层与组件边界为设计建议
+end note
+note bottom of CDN
+  事实(SRC-09)：Server: cloudflare
+  事实(SRC-07)：限流 + 深分页上限
+end note
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+' 图ID: FIG-02 | 状态图 | PlantUML | REQ-10 / BR-08 / Q-02 | 源码已自检，未在渲染器实测
+title 活动条目 EventItem 生命周期状态图（状态枚举为设计建议，待 Q-02 确认）
+
+state "草稿 Draft" as Draft
+state "待审核 PendingReview" as PendingReview
+state "已撤回 Withdrawn" as Withdrawn
+state "已排期 Scheduled" as Scheduled
+state "已发布 Published" as Published
+state "进行中 InProgress" as InProgress
+state "已结束 Completed" as Completed
+state "已改期 Rescheduled" as Rescheduled
+state "已取消 Cancelled" as Cancelled
+state "已归档 Archived" as Archived
+
+[*] --> Draft : 录入条目
+Draft --> Draft : 必填校验失败 [保持草稿]
+Draft --> PendingReview : 提交审核 [字段齐备]
+PendingReview --> Scheduled : 审核通过 [馆员确认]
+PendingReview --> Draft : 审核驳回 [退回草稿]
+Scheduled --> Withdrawn : 撤回 [馆员发起]
+Withdrawn --> [*]
+Scheduled --> Published : 发布 [审核通过，待确认]
+Published --> InProgress : 到达 startUtc [无自动策略证据]
+InProgress --> Completed : 到达 endUtc
+Completed --> Archived : 归档
+Published --> Rescheduled : 改期 [event_rescheduled = true]
+Scheduled --> Rescheduled : 改期 [event_rescheduled = true]
+Rescheduled --> Published : 重新发布 [审核通过，待确认]
+Published --> Cancelled : 取消 [原因待确认 Q-02]
+Scheduled --> Cancelled : 取消 [原因待确认 Q-02]
+Cancelled --> [*]
+Archived --> [*]
+
+note right of Rescheduled
+  只有 event_rescheduled 是字段证据(SRC-08)
+  其余状态名、守卫、执行角色均为设计建议
+  第2轮新增 PendingReview / Withdrawn（设计建议）
+  未补任何超时阈值/重试次数/自动通过策略
+  撤回 != 驳回 != 取消，三者不合并
+end note
+note bottom of Published
+  校验失败与日历导出失败
+  均不得进入 Completed
+end note
+@enduml

@@ -1,0 +1,140 @@
+@startuml
+' 图ID: FIG-01 | 类图 | PlantUML | REQ-01..REQ-08 / BR-02,BR-03,BR-04,BR-06 | 源码已自检，未在渲染器实测
+title 美国国会图书馆「活动与馆藏资源检索」领域对象类图（第 2 轮定稿）
+
+class "活动系列 EventSeries" as EventSeries {
+  +seriesId: String
+  +title: String
+  +partOfTag: String
+  +description: Text
+  +listItems(): EventItem[]
+}
+class "活动条目 EventItem" as EventItem {
+  +itemId: String
+  +slug: String
+  +title: String
+  +eventType: String
+  +description: Text
+  +startLocal: DateTime
+  +endLocal: DateTime
+  +startUtc: DateTime
+  +endUtc: DateTime
+  +eventStatus: String
+  +rescheduled: Boolean
+  +url: URI
+  +imageUrl: URI
+  +exportCalendar(): CalendarExport
+}
+class "场馆 Venue" as Venue {
+  +buildingKey: String
+  +building: String
+  +floor: String
+  +room: String
+}
+class "地址 Address" as Address {
+  +street: String
+  +city: String
+  +state: String
+  +zipcode: String
+}
+class "主题分类词 SubjectTerm" as SubjectTerm {
+  +termId: String
+  +label: String
+  +type: String
+}
+class "馆藏展品 Exhibit" as Exhibit {
+  +itemId: String
+  +title: String
+}
+class "查询规格 QuerySpec" as QuerySpec {
+  +q: String
+  +fo: OutputFormat
+  +c: Integer
+  +sp: Integer
+  +sb: String
+  +at: String[]
+  +validate(): Boolean
+}
+class "分面条件 FacetFilter" as FacetFilter {
+  +field: String
+  +value: String
+  +count: Integer
+  +on: Boolean
+}
+enum "输出格式 OutputFormat" as OutputFormat {
+  HTML
+  JSON
+  YAML
+  ICAL
+}
+class "结果页 ResultPage" as ResultPage {
+  +total: Integer
+  +current: Integer
+  +perpage: Integer
+  +from: Integer
+  +to: Integer
+  +results: EventItem[]
+  +facets: FacetFilter[]
+}
+class "日历导出 CalendarExport" as CalendarExport {
+  +format: OutputFormat
+  +payload: Text
+  +buildIcal(): Text
+  +buildGoogleUrl(): URI
+}
+class "编审任务 EditorialTask" as EditorialTask {
+  +taskId: String
+  +itemId: String
+  +editorId: String
+  +action: String
+  +status: String
+  +submit(): Boolean
+  +approve(): Boolean
+}
+class "馆员 ContentEditor" as ContentEditor {
+  +editorId: String
+  +role: String
+  +scope: String
+  +edit(itemId): Boolean
+}
+class "智能体控制器 AgentController" as AgentController {
+  +perceive(query): String
+  +plan(): String[]
+  +decide(): String
+  +act(toolId): Result
+}
+class "工具与记忆 ToolRegistry" as ToolRegistry {
+  +toolId: String
+  +permission: String
+  +memory: String
+  +knowledgeBase: String
+  +invoke(params): Result
+}
+
+EventSeries "1" -- "0..*" EventItem : partof 聚合
+EventItem "0..*" -- "1" Venue : 举办于
+Venue "1" *-- "1" Address : 组合
+EventItem "0..*" -- "0..*" SubjectTerm : 标注
+EventItem "0..*" -- "0..*" Exhibit : 关联展品(设计建议)
+QuerySpec "1" *-- "0..*" FacetFilter : 组合
+QuerySpec ..> OutputFormat : 选择
+QuerySpec ..> ResultPage : 生成
+ResultPage "1" o-- "0..*" EventItem : 包含
+ResultPage "1" o-- "0..*" FacetFilter : 分面统计
+EventItem "1" ..> "1" CalendarExport : 导出
+ContentEditor "1" -- "0..*" EditorialTask : 提交与审核
+EditorialTask "0..*" -- "1" EventItem : 维护条目
+AgentController ..> ToolRegistry : 受控工具调用
+ToolRegistry ..> QuerySpec : 组装检索条件
+AgentController ..> ResultPage : 读取结果
+
+note right of EventItem
+  事实：JSON 的 results[].item 含
+  event_start_* / event_status / venue / partof
+  中文类名与类边界为设计建议
+end note
+note bottom of ResultPage
+  事实：pagination.total = 385
+  facets[].filters[].count 提供分面计数
+end note
+@enduml

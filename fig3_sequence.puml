@@ -1,0 +1,63 @@
+@startuml
+' 图ID: FIG-03 | 交互图(时序图) | PlantUML | UC-01 / REQ-01,05,06,07 / BR-01..BR-05,BR-07 | 源码已自检，未在渲染器实测
+title UC-01 读者按系列检索活动列表并导出日历
+
+actor "访客/读者" as Visitor
+participant "浏览器 UI" as Browser
+participant "智能体入口\nAgentController" as Agent
+participant "事件列表控制器\nEventsController" as Controller
+participant "查询服务\nQueryService" as QueryService
+participant "检索与分面引擎\nSearchIndex" as Search
+participant "条目仓储\nItemRepository" as Repo
+participant "格式渲染器\nViewRenderer" as Renderer
+participant "外部日历\nGoogle / iCal 客户端" as Calendar
+
+Visitor -> Browser: 打开 /events/?fa=partof:live at the library
+Browser -> Controller: HTTP GET (fa, fo 默认 html)
+Controller -> QueryService: 构造 QuerySpec(fa, q, c, sp, sb, at)
+QueryService -> QueryService: 校验字段与取值 [BR-01]
+alt 校验失败
+  QueryService --> Controller: 返回参数错误
+  Controller --> Browser: 兜底结果 [状态码/文案待确认 Q-03]
+else 校验通过
+  QueryService -> Search: 按 partof 过滤 + 分面计数 [BR-02]
+  Search -> Repo: 读取 EventItem 元数据与 venue [BR-03]
+  Repo --> Search: EventItem 列表
+  Search --> QueryService: 命中集与 facets
+  QueryService -> QueryService: 组装 ResultPage [BR-04]
+  QueryService --> Controller: ResultPage
+  alt fo 默认 HTML
+    Controller -> Renderer: 按日期分组渲染 [BR-05]
+    Renderer --> Browser: 列表页(日期/类型/时间/地点/简介)
+  else fo=json 或 fo=yaml
+    Controller -> Renderer: 序列化(含 pagination 与 facets)
+    Renderer --> Browser: 结构化数据
+  else fo=ical
+    Controller -> Renderer: 生成 text/calendar
+    Renderer --> Browser: .ics 文件
+  end
+  Browser --> Visitor: 展示结果
+  opt 智能体检索入口 [REQ-14 / 设计建议]
+    Visitor -> Browser: 自然语言提问
+    Browser -> Agent: 感知并识别意图
+    Agent -> QueryService: 规划后受控工具调用检索
+    QueryService --> Agent: 候选结果
+    Agent --> Browser: 展示或追问 [信息不足时]
+  end
+  opt 加入日历 [REQ-05 / BR-07]
+    Visitor -> Browser: 点击 Add to calendar
+    alt Apple/Outlook
+      Browser -> Controller: GET 同一 item ?fo=ical
+      Controller --> Browser: .ics
+    else Google
+      Browser -> Calendar: 跳转 calendar.google.com/render?action=TEMPLATE
+      Calendar --> Visitor: 预填日历表单
+    end
+  end
+end
+
+note over Controller,Renderer
+  事实：官方说明 loc.gov JSON API 原本用于驱动网站页面
+  HTML/JSON/iCal 是同一后端的不同表示，非前后分离 SPA
+end note
+@enduml
